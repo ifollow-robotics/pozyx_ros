@@ -6,7 +6,10 @@ import rospy
 from pozyx_ros_examples.msg import DeviceRange
 
 remote_id = None
-destination_id = 0x6036
+# destination_id = 0x6045
+# destination_id = 0x611b
+# destination_id = 0x614b
+destination_id = 0x6025
 
 
 def pozyx_ranging_pub():

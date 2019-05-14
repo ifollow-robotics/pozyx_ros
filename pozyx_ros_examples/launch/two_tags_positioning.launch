@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="pozyx_ros_examples" type="positioning_pub.py" name="positioning_pub" output="screen">
+    <rosparam param="tags">[None, 0x6152]</rosparam>
+    <param name="frequency" type="double" value="60.0" />
+  </node>
+</launch>

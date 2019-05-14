@@ -7,39 +7,35 @@ This requires all devices to be on the same UWB settings first, so I highly
 recommend to run the uwb_configurator node first.
 """
 
+ANCHOR_HEIGHT = 1775
+TAG_HEIGHT = 10
+
 import pypozyx
 import rospy
 import time
 
-# anchors = [pypozyx.DeviceCoordinates(0x0001, 1, pypozyx.Coordinates(0, 0, 5000)),
-#            pypozyx.DeviceCoordinates(0x0002, 1, pypozyx.Coordinates(5000, 0, 1000)),
-#            pypozyx.DeviceCoordinates(0x0003, 1, pypozyx.Coordinates(0, 5000, 1000)),
-#            pypozyx.DeviceCoordinates(0x0004, 1, pypozyx.Coordinates(5000, 5000, 1000))]
-
-# anchors_ids = [0x614b, 0x6025, 0x611b, 0x6045, 0x612f, 0x6160]
-
-# dev: 0x6045
-# dev: 0x6025
-# dev: 0x611b
-# dev: 0x614b
-# dev: 0x612f
-
-
 def set_anchor_configuration():
-    # tag_ids = [None]
-    tag_ids = [None, 0x6152]
-    rospy.init_node('uwb_configurator')
+    tag_ids = [None]
+    # tag_ids = [None, 0x600D]
+    rospy.init_node('autocalibration')
     rospy.loginfo("Configuring device list.")
 
-
-    settings_registers = [0x16, 0x17]  # POS ALG and NUM ANCHORS
+    settings_registers = [0x16, 0x17]  # POS ALG and NUM ANCHORS and POS_Z
     try:
         pozyx = pypozyx.PozyxSerial(pypozyx.get_first_pozyx_serial_port())
     except:
         rospy.loginfo("Pozyx not connected")
         return
 
-    pozyx.clearDevices()
+    for tag in tag_ids:
+        pozyx.clearDevices(remote_id=tag)
+        ret = pozyx.setHeight(TAG_HEIGHT, remote_id=tag)
+        if pypozyx.POZYX_SUCCESS != ret:
+            if tag != None:
+                print("Failed to set height to 0x%0.4x" % tag)
+            else:
+                print("Failed to set height to local device")
+        pozyx.saveRegisters([0x38], remote_id=tag)
 
     pozyx.doDiscovery(discovery_type=pypozyx.POZYX_DISCOVERY_ANCHORS_ONLY, slots=9, slot_duration=0.2)
     device_list_size = pypozyx.SingleRegister()
@@ -51,22 +47,42 @@ def set_anchor_configuration():
     else:
         rospy.loginfo("Not enough anchors")
         return
-    # pozyx.clearDevices()
-
-    # pozyx.doDiscovery(discovery_type=pypozyx.POZYX_DISCOVERY_ALL_DEVICES, slots=9, slot_duration=0.2)
-    # device_list_size = pypozyx.SingleRegister()
-    # pozyx.getDeviceListSize(device_list_size)
-    # tags_list = pypozyx.DeviceList(list_size=device_list_size[0])
 
     print("Number of found anchors: {}".format(len(anchors_list.data)))
 
     for anchor_id in anchors_list.data:
-        print("anchor: 0x%0.4x" % anchor_id)
+        print("  - 0x%0.4x" % anchor_id)
 
     for tag in tag_ids:
-        ret = pozyx.doAnchorCalibration(pypozyx.PozyxConstants.DIMENSION_2_5D, 255, anchors_list.data, heights=[1735]*len(anchors_list.data), remote_id=tag)
-        if pypozyx.POZYX_SUCCESS != ret:
-            print("Failed to calibrate")
+        while True:
+            ret = pozyx.doAnchorCalibration(pypozyx.PozyxConstants.DIMENSION_2_5D, 200, anchors_list.data, heights=[ANCHOR_HEIGHT]*len(anchors_list.data), remote_id=None)
+            if pypozyx.POZYX_SUCCESS != ret:
+                if tag != None:
+                    print("Failed to calibrate 0x%0.4x" % tag)
+                else:
+                    print("Failed to calibrate for local" % tag)
+                continue
+            for anchor in anchors_list.data:
+                status = pypozyx.SingleRegister()
+                pozyx.getCalibrationStatus(status, remote_id=anchor)
+                print('Calib status for 0x%0.4x' % anchor)
+                print('    {}'.format(status[0]))
+                if status[0] == 0:
+                    break
+            else: # nobreak
+                break
+
+    # for anchor in anchors_list.data:
+    #     print("Positioning 0x%0.4x" % anchor)
+    #     coord = pypozyx.Coordinates()
+    #     pozyx.doPositioning(coord, dimension=pypozyx.PozyxConstants.DIMENSION_2_5D, height=pypozyx.Data([1775], 'i'), timeout=0.2, remote_id=anchor)
+    #     print(coord)
+    #     pozyx.saveRegisters([0x38], remote_id=tag)
+
+        # coord = pypozyx.Coordinates()
+        # pozyx.getCoordinates(coord, remote_id=anchor)
+        # print(coord)
+        # pozyx.addDevice(pypozyx.DeviceCoordinates(anchor, 1, coord), tag)
 
     # for anchor in anchors_list.data:
     #     pozyx.setSelectionOfAnchors(pypozyx.POZYX_ANCHOR_SEL_AUTO,
@@ -108,27 +124,24 @@ def set_anchor_configuration():
     # for tag in tag_ids:
     #     if tag != None:
     #         print("tag: 0x%0.4x" % tag)
-    time.sleep(5)
     for tag in tag_ids:
-        # if tag != None:
-        #     for anchor in anchors_list.data:
-        #         print("Positioning 0x%0.4x" % anchor)
-        #         coord = pypozyx.Coordinates()
-        #         pozyx.doPositioning(coord, dimension=pypozyx.PozyxConstants.DIMENSION_2_5D, height=pypozyx.Data([1735], 'i'), timeout=0.2, remote_id=anchor)
-        #         print(coord)
-        #         # coord = pypozyx.Coordinates()
-        #         pozyx.getCoordinates(coord, remote_id=anchor)
-        #         print(coord)
-        #         pozyx.addDevice(pypozyx.DeviceCoordinates(anchor, 1, coord), tag)
-            if len(anchors_list.data) > 4:
-                pozyx.setSelectionOfAnchors(pypozyx.POZYX_ANCHOR_SEL_AUTO,
-                                            len(anchors_list.data), remote_id=tag)
-                pozyx.saveRegisters(settings_registers, remote_id=tag)
-            pozyx.saveNetwork(remote_id=tag)
-            if tag is None:
-                rospy.loginfo("Local device configured")
-            else:
-                rospy.loginfo("Device with ID 0x%0.4x configured." % tag)
+        if tag != None:
+            pozyx.clearDevices(remote_id=tag)
+            for anchor in anchors_list.data:
+                print("Positioning 0x%0.4x" % anchor)
+                coord = pypozyx.Coordinates()
+                pozyx.doPositioning(coord, dimension=pypozyx.PozyxConstants.DIMENSION_2_5D, height=pypozyx.Data([1735], 'i'), timeout=0.2, remote_id=anchor)
+                print(coord)
+                pozyx.addDevice(pypozyx.DeviceCoordinates(anchor, 1, coord), tag)
+        if len(anchors_list.data) > 4:
+            pozyx.setSelectionOfAnchors(pypozyx.POZYX_ANCHOR_SEL_AUTO,
+                                        len(anchors_list.data), remote_id=tag)
+            pozyx.saveRegisters(settings_registers, remote_id=tag)
+        pozyx.saveNetwork(remote_id=tag)
+        if tag is None:
+            rospy.loginfo("Local device configured")
+        else:
+            rospy.loginfo("Device with ID 0x%0.4x configured." % tag)
     rospy.loginfo("Configuration completed! Shutting down node now...")
 
 

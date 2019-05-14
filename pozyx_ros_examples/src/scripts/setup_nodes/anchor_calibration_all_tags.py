@@ -10,23 +10,26 @@ recommend to run the uwb_configurator node first.
 import pypozyx
 import rospy
 
-anchors = [pypozyx.DeviceCoordinates(0x0001, 1, pypozyx.Coordinates(0, 0, 5000)),
-           pypozyx.DeviceCoordinates(0x0002, 1, pypozyx.Coordinates(5000, 0, 1000)),
-           pypozyx.DeviceCoordinates(0x0003, 1, pypozyx.Coordinates(0, 5000, 1000)),
-           pypozyx.DeviceCoordinates(0x0004, 1, pypozyx.Coordinates(5000, 5000, 1000))]
-
+anchors = [pypozyx.DeviceCoordinates(0x6045, 1, pypozyx.Coordinates(0, 0, 1775)),
+           pypozyx.DeviceCoordinates(0x614b, 1, pypozyx.Coordinates(2000, 0, 1775)),
+           pypozyx.DeviceCoordinates(0x6025, 1, pypozyx.Coordinates(2000, 2000, 1775)),
+           pypozyx.DeviceCoordinates(0x611b, 1, pypozyx.Coordinates(0, 2000, 1775))]
 
 def set_anchor_configuration():
-    tag_ids = [None]
+    # tag_ids = [None]
+    tag_ids = [None, 0x600d]
     rospy.init_node('uwb_configurator')
     rospy.loginfo("Configuring device list.")
 
     settings_registers = [0x16, 0x17]  # POS ALG and NUM ANCHORS
     try:
-        pozyx = pypozyx.PozyxSerial(pypozyx.get_serial_ports()[0].device)
+        pozyx = pypozyx.PozyxSerial(pypozyx.get_first_pozyx_serial_port())
     except:
         rospy.loginfo("Pozyx not connected")
         return
+
+    pozyx.clearDevices()
+
     pozyx.doDiscovery(discovery_type=pypozyx.POZYX_DISCOVERY_TAGS_ONLY)
     device_list_size = pypozyx.SingleRegister()
     pozyx.getDeviceListSize(device_list_size)
@@ -46,7 +49,7 @@ def set_anchor_configuration():
         if tag is None:
             rospy.loginfo("Local device configured")
         else:
-            rosply.loginfo("Device with ID 0x%0.4x configured." % tag)
+            rospy.loginfo("Device with ID 0x%0.4x configured." % tag)
     rospy.loginfo("Configuration completed! Shutting down node now...")
 
 
