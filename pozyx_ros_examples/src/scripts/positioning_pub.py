@@ -3,16 +3,16 @@
 
 import pypozyx
 import rospy
-from geometry_msgs.msg import Point32
+from geometry_msgs.msg import PointStamped
 
 remote_id = None
-
+# remote_id = 0x6152
 
 def pozyx_positioning_pub():
-    pub = rospy.Publisher('pozyx_positioning', Point32, queue_size=100)
+    pub = rospy.Publisher('pozyx_positioning_' + str(remote_id), PointStamped, queue_size=100)
     rospy.init_node('positioning_pub')
     try:
-        pozyx = pypozyx.PozyxSerial(pypozyx.get_serial_ports()[0].device)
+        pozyx = pypozyx.PozyxSerial(pypozyx.get_first_pozyx_serial_port())
     except:
         rospy.loginfo("Pozyx not connected")
         return
@@ -20,8 +20,13 @@ def pozyx_positioning_pub():
         coords = pypozyx.Coordinates()
         pozyx.doPositioning(coords, remote_id=remote_id)
         rospy.loginfo(coords)
-        pub.publish(Point32(coords.x, coords.y, coords.z))
-
+        msg = PointStamped()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = "pozyx"
+        msg.point.x = coords.x
+        msg.point.y = coords.y
+        msg.point.z = coords.z
+        pub.publish(msg)
 
 if __name__ == '__main__':
     try:
