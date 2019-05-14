@@ -15,9 +15,9 @@ import pypozyx
 import rospy
 
 new_uwb_settings = pypozyx.UWBSettings(
-    channel=2, bitrate=2, prf=2, plen=0x04, gain_db=15.0)
+    channel=5, bitrate=1, prf=2, plen=0x08, gain_db=11.5)
 
-gain_db = 15.0
+gain_db = 11.5
 
 
 def set_same_uwb_settings():
